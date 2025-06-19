@@ -124,14 +124,21 @@ export default function LandingPage() {
               Ready to boost your Aura and Rizz? ✨
             </p>
             
-            {/* Bolt Badge - positioned in bottom right */}
+            {/* Bolt Badge - positioned in bottom right, doubled in size, clickable */}
             <div className="absolute bottom-0 right-0 transform translate-x-4 translate-y-2">
-              <img 
-                src="/white_circle_360x360.png" 
-                alt="Powered by Bolt" 
-                className="w-12 h-12 opacity-60 hover:opacity-80 transition-opacity cursor-pointer"
-                title="Powered by Bolt"
-              />
+              <a 
+                href="https://bolt.new" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <img 
+                  src="/white_circle_360x360.png" 
+                  alt="Powered by Bolt" 
+                  className="w-24 h-24 opacity-60 hover:opacity-80 transition-opacity cursor-pointer"
+                  title="Powered by Bolt"
+                />
+              </a>
             </div>
           </div>
         </footer>
