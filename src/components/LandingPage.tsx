@@ -119,10 +119,20 @@ export default function LandingPage() {
 
         {/* Footer */}
         <footer className="px-6 py-8">
-          <div className="text-center">
+          <div className="text-center relative">
             <p className="text-glow-white/60 text-sm">
               Ready to boost your Aura and Rizz? ✨
             </p>
+            
+            {/* Bolt Badge - positioned in bottom right */}
+            <div className="absolute bottom-0 right-0 transform translate-x-4 translate-y-2">
+              <img 
+                src="/white_circle_360x360.png" 
+                alt="Powered by Bolt" 
+                className="w-12 h-12 opacity-60 hover:opacity-80 transition-opacity cursor-pointer"
+                title="Powered by Bolt"
+              />
+            </div>
           </div>
         </footer>
       </div>
