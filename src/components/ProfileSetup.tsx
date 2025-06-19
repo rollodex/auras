@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Camera, Plus, X } from 'lucide-react';
+import { ArrowLeft, Camera, Plus, X, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfileSetup() {
   const navigate = useNavigate();
-  const { updateUserProfile } = useAuth();
+  const { updateUserProfile, user } = useAuth();
   const [formData, setFormData] = useState({
+    name: user?.name || '',
     age: '',
     gender: 'non-binary' as 'male' | 'female' | 'non-binary',
     bio: '',
@@ -44,7 +45,7 @@ export default function ProfileSetup() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.age && formData.bio && formData.interests.length > 0) {
+    if (formData.name && formData.age && formData.bio && formData.interests.length > 0) {
       const profileData = {
         ...formData,
         age: parseInt(formData.age),
@@ -88,6 +89,21 @@ export default function ProfileSetup() {
 
           {/* Basic Info */}
           <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 space-y-4">
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/50" />
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-white/10 border border-white/20 rounded-xl pl-12 pr-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  placeholder="Your name"
+                  required
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-white text-sm font-medium mb-2">Age</label>
               <input
