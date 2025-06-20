@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, X, Loader } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, X, Loader, AlertCircle } from 'lucide-react';
 import { User } from '../types';
 import { VoiceCallService } from '../services/voiceCall';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +18,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [voiceService] = useState(new VoiceCallService());
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const callTimerRef = useRef<NodeJS.Timeout>();
@@ -47,8 +48,17 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
   };
 
   const startCall = async () => {
+    // Check for validation errors before starting
+    const validationError = voiceService.getValidationError();
+    if (validationError) {
+      setErrorMessage(validationError);
+      setCallState('error');
+      return;
+    }
+
     setCallState('connecting');
     setCallDuration(0);
+    setErrorMessage('');
 
     // Prepare user profile for the voice call
     const userProfile = currentUser ? {
@@ -63,7 +73,12 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
       user.name,
       user.personality.detailedPrompt,
       user.personality.aiPersona,
-      setCallState,
+      (state) => {
+        setCallState(state);
+        if (state === 'error') {
+          setErrorMessage('Failed to connect to voice service. Please check your API configuration.');
+        }
+      },
       userProfile
     );
 
@@ -82,6 +97,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
       onClose();
       setCallState('idle');
       setCallDuration(0);
+      setErrorMessage('');
     }, 2000);
   };
 
@@ -92,10 +108,14 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
       onClose();
       setCallState('idle');
       setCallDuration(0);
+      setErrorMessage('');
     }
   };
 
   if (!isOpen) return null;
+
+  const hasApiKey = !!import.meta.env.VITE_ELEVENLABS_API_KEY;
+  const hasAgentId = !!import.meta.env.VITE_ELEVENLABS_AGENT_ID;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
@@ -146,11 +166,18 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             </p>
             <button
               onClick={startCall}
-              className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto hover:shadow-xl transition-all transform hover:scale-105"
+              disabled={!hasApiKey || !hasAgentId}
+              className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto transition-all transform ${
+                hasApiKey && hasAgentId
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:shadow-xl hover:scale-105'
+                  : 'bg-gray-500 cursor-not-allowed opacity-50'
+              }`}
             >
               <Phone className="w-8 h-8 text-white" />
             </button>
-            <p className="text-white/60 text-sm mt-4">Tap to start call</p>
+            <p className="text-white/60 text-sm mt-4">
+              {hasApiKey && hasAgentId ? 'Tap to start call' : 'API configuration required'}
+            </p>
           </div>
         )}
 
@@ -167,14 +194,17 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
         {callState === 'error' && (
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <PhoneOff className="w-8 h-8 text-white" />
+              <AlertCircle className="w-8 h-8 text-white" />
             </div>
             <p className="text-white text-lg font-medium mb-2">Call Failed</p>
             <p className="text-white/70 text-sm mb-4">
-              Unable to connect. Please check your API key configuration.
+              {errorMessage || 'Unable to connect. Please check your API configuration.'}
             </p>
             <button
-              onClick={() => setCallState('idle')}
+              onClick={() => {
+                setCallState('idle');
+                setErrorMessage('');
+              }}
               className="bg-white/20 text-white px-6 py-2 rounded-xl hover:bg-white/30 transition-colors"
             >
               Try Again
@@ -248,12 +278,22 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
           </div>
         )}
 
-        {/* API Key Notice */}
-        {!import.meta.env.VITE_ELEVENLABS_API_KEY && (
+        {/* API Configuration Notice */}
+        {(!hasApiKey || !hasAgentId) && (
           <div className="mt-6 p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
-            <p className="text-yellow-200 text-sm text-center">
-              Voice calls require an ElevenLabs API key. Add VITE_ELEVENLABS_API_KEY to your .env file.
-            </p>
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-yellow-200 mt-0.5 flex-shrink-0" />
+              <div className="text-yellow-200 text-sm">
+                <p className="font-medium mb-2">Voice calls require ElevenLabs configuration:</p>
+                <ul className="space-y-1 text-xs">
+                  {!hasApiKey && <li>• Add VITE_ELEVENLABS_API_KEY to your .env file</li>}
+                  {!hasAgentId && <li>• Add VITE_ELEVENLABS_AGENT_ID to your .env file</li>}
+                </ul>
+                <p className="mt-2 text-xs opacity-80">
+                  Get your API key and create an agent at elevenlabs.io
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -15,12 +15,32 @@ interface ElevenLabsSignedUrl {
 
 export class VoiceCallService {
   private apiKey: string;
+  private agentId: string;
   private baseUrl = 'https://api.elevenlabs.io/v1/convai/conversations';
   private conversation: any = null;
   private isCallActive = false;
 
   constructor() {
     this.apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY || '';
+    this.agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID || '';
+  }
+
+  private validateCredentials(): { isValid: boolean; error?: string } {
+    if (!this.apiKey) {
+      return {
+        isValid: false,
+        error: 'ElevenLabs API key is missing. Please add VITE_ELEVENLABS_API_KEY to your .env file.'
+      };
+    }
+
+    if (!this.agentId) {
+      return {
+        isValid: false,
+        error: 'ElevenLabs Agent ID is missing. Please add VITE_ELEVENLABS_AGENT_ID to your .env file.'
+      };
+    }
+
+    return { isValid: true };
   }
 
   async startCall(
@@ -43,8 +63,10 @@ export class VoiceCallService {
       };
     }
   ): Promise<string | null> {
-    if (!this.apiKey) {
-      console.warn('ElevenLabs API key not found. Voice calls require an API key.');
+    // Validate credentials first
+    const validation = this.validateCredentials();
+    if (!validation.isValid) {
+      console.warn('Voice call validation failed:', validation.error);
       onCallStateChange?.('error');
       return null;
     }
@@ -84,7 +106,7 @@ Use this information to:
 
       // Create a conversation with the persona
       const conversationConfig: ElevenLabsConversationConfig = {
-        agent_id: import.meta.env.VITE_ELEVENLABS_AGENT_ID || 'default',
+        agent_id: this.agentId,
         override_agent_config: {
           prompt: {
             prompt: `${personalityPrompt}
@@ -114,6 +136,11 @@ IMPORTANT VOICE CALL INSTRUCTIONS:
         }
       };
 
+      console.log('Creating conversation with config:', {
+        agent_id: this.agentId,
+        hasPrompt: !!conversationConfig.override_agent_config?.prompt?.prompt
+      });
+
       // Get signed URL for the conversation
       const response = await fetch(`${this.baseUrl}/auth`, {
         method: 'POST',
@@ -125,7 +152,25 @@ IMPORTANT VOICE CALL INSTRUCTIONS:
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create conversation: ${response.status}`);
+        const errorText = await response.text();
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        
+        if (response.status === 401) {
+          errorMessage = 'Invalid API key. Please check your VITE_ELEVENLABS_API_KEY in the .env file.';
+        } else if (response.status === 404) {
+          errorMessage = 'Agent not found. Please check your VITE_ELEVENLABS_AGENT_ID in the .env file.';
+        } else if (response.status === 405) {
+          errorMessage = 'Method not allowed. This usually indicates an issue with API credentials or agent configuration.';
+        }
+        
+        console.error('ElevenLabs API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+          agentId: this.agentId
+        });
+        
+        throw new Error(errorMessage);
       }
 
       const data: ElevenLabsSignedUrl = await response.json();
@@ -147,5 +192,10 @@ IMPORTANT VOICE CALL INSTRUCTIONS:
 
   isActive(): boolean {
     return this.isCallActive;
+  }
+
+  getValidationError(): string | null {
+    const validation = this.validateCredentials();
+    return validation.isValid ? null : validation.error || 'Unknown validation error';
   }
 }
