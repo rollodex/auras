@@ -85,11 +85,11 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
   };
 
   const startCall = async () => {
-    const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
+    const agentId = user.agentID;
     
     if (!agentId) {
       setCallState('error');
-      setErrorMessage('Agent ID is not configured. Please add VITE_ELEVENLABS_AGENT_ID to your .env file.');
+      setErrorMessage(`${user.name} doesn't have a voice agent configured yet. Voice calls are not available for this profile.`);
       return;
     }
 
@@ -103,7 +103,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
     setErrorMessage('');
 
     try {
-      // Start the conversation session
+      // Start the conversation session with the user's specific agent ID
       const id = await conversation.startSession({ 
         agentId: agentId 
       });
@@ -148,7 +148,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
 
   if (!isOpen) return null;
 
-  const hasAgentId = !!import.meta.env.VITE_ELEVENLABS_AGENT_ID;
+  const hasAgentId = !!user.agentID;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
@@ -222,7 +222,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
               <Phone className="w-8 h-8 text-white" />
             </button>
             <p className="text-white/60 text-sm mt-4">
-              {hasAgentId ? 'Tap to start call' : 'Agent ID configuration required'}
+              {hasAgentId ? 'Tap to start call' : `${user.name} doesn't have voice calls enabled`}
             </p>
           </div>
         )}
@@ -276,7 +276,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             </div>
             <p className="text-white text-lg font-medium mb-2">Call Failed</p>
             <p className="text-white/70 text-sm mb-4">
-              {errorMessage || 'Unable to connect. Please check your configuration.'}
+              {errorMessage || 'Unable to connect. Please try again.'}
             </p>
             <button
               onClick={() => setCallState('idle')}
@@ -320,18 +320,15 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
           </div>
         )}
 
-        {/* Configuration Notice */}
+        {/* Agent Configuration Notice */}
         {!hasAgentId && (
           <div className="mt-6 p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
             <div className="flex items-start space-x-3">
               <AlertCircle className="w-5 h-5 text-yellow-200 mt-0.5 flex-shrink-0" />
               <div className="text-yellow-200 text-sm">
-                <p className="font-medium mb-2">Voice calls require ElevenLabs configuration:</p>
-                <ul className="space-y-1 text-xs">
-                  <li>• Add VITE_ELEVENLABS_AGENT_ID to your .env file</li>
-                </ul>
-                <p className="mt-2 text-xs opacity-80">
-                  Create an agent at elevenlabs.io/app/conversational-ai
+                <p className="font-medium mb-2">Voice calls not available for {user.name}</p>
+                <p className="text-xs opacity-80">
+                  This profile doesn't have a voice agent configured yet. Each user needs their own ElevenLabs agent ID for personalized voice conversations.
                 </p>
               </div>
             </div>
@@ -348,6 +345,14 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
               {conversation.status || 'disconnected'}
             </span>
           </div>
+          {hasAgentId && (
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-blue-200 text-sm">Agent ID:</span>
+              <span className="text-gray-300 text-xs font-mono">
+                {user.agentID?.slice(0, 12)}...
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

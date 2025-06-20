@@ -9,6 +9,7 @@ export interface User {
   photos: string[];
   auraColor: string;
   location?: string;
+  agentID?: string;
 }
 
 export interface PersonalityProfile {
