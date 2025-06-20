@@ -20,7 +20,8 @@ export const sampleUsers: User[] = [
     },
     photos: ['https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg'],
     auraColor: 'from-orange-400 to-pink-500',
-    location: 'San Francisco, CA'
+    location: 'San Francisco, CA',
+    agentID:'agent_01jy624p4nf36aky1whjns6pze'
   },
   {
     id: '2',
@@ -41,7 +42,8 @@ export const sampleUsers: User[] = [
     },
     photos: ['https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg'],
     auraColor: 'from-purple-400 to-blue-500',
-    location: 'Portland, OR'
+    location: 'Portland, OR',
+    agentID:'agent_01jy624p4nf36aky1whjns6pze'
   },
   {
     id: '3',
@@ -62,7 +64,8 @@ export const sampleUsers: User[] = [
     },
     photos: ['https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg'],
     auraColor: 'from-green-400 to-teal-500',
-    location: 'Austin, TX'
+    location: 'Austin, TX',
+    agentID:'agent_01jy624p4nf36aky1whjns6pze'
   },
   {
     id: '4',
@@ -83,7 +86,8 @@ export const sampleUsers: User[] = [
     },
     photos: ['https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg'],
     auraColor: 'from-emerald-400 to-cyan-500',
-    location: 'Seattle, WA'
+    location: 'Seattle, WA',
+    agentID:'agent_01jy624p4nf36aky1whjns6pze'
   },
   {
     id: '5',
@@ -104,7 +108,8 @@ export const sampleUsers: User[] = [
     },
     photos: ['https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg'],
     auraColor: 'from-indigo-400 to-purple-500',
-    location: 'Brooklyn, NY'
+    location: 'Brooklyn, NY',
+    agentID:'agent_01jy624p4nf36aky1whjns6pze'
   },
   {
     id: '6',
@@ -125,6 +130,7 @@ export const sampleUsers: User[] = [
     },
     photos: ['https://images.pexels.com/photos/1239288/pexels-photo-1239288.jpeg'],
     auraColor: 'from-pink-400 to-rose-500',
-    location: 'Denver, CO'
+    location: 'Denver, CO',
+    agentID:'agent_01jy624p4nf36aky1whjns6pze'
   }
 ];
