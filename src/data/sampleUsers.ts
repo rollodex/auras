@@ -65,7 +65,7 @@ export const sampleUsers: User[] = [
     photos: ['https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg'],
     auraColor: 'from-green-400 to-teal-500',
     location: 'Austin, TX',
-    agentID:'agent_01jy624p4nf36aky1whjns6pze'
+    agentID:'agent_01jy63jm8sezzasn6r2zceqnhc'
   },
   {
     id: '4',
