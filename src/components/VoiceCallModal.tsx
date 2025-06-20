@@ -331,10 +331,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
           </div>
         )}
 
-        {/* Connection Status */}
-      
-          )}
-        </div>
+        
       </div>
     </div>
   );
