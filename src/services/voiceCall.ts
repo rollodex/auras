@@ -1,16 +1,44 @@
+import { ElevenLabsClient } from '@elevenlabs/client';
+
 export class VoiceCallService {
+  private client: ElevenLabsClient;
+  private conversation: any = null;
   private isCallActive = false;
 
   constructor() {
-    // Simple service for managing call state
+    const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
+    if (apiKey) {
+      this.client = new ElevenLabsClient({ apiKey });
+    }
   }
 
-  startCall(): void {
-    this.isCallActive = true;
+  async startCall(agentId: string): Promise<any> {
+    if (!this.client) {
+      throw new Error('ElevenLabs client not initialized. Please check your API key.');
+    }
+
+    if (!agentId) {
+      throw new Error('Agent ID is required to start a conversation.');
+    }
+
+    try {
+      // Use the correct API from @elevenlabs/client
+      const conversation = await this.client.conversationalAi.createConversation({
+        agentId: agentId,
+      });
+
+      this.conversation = conversation;
+      this.isCallActive = true;
+      return conversation;
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+      throw error;
+    }
   }
 
   endCall(): void {
     this.isCallActive = false;
+    this.conversation = null;
   }
 
   isActive(): boolean {
