@@ -1,4 +1,4 @@
-import { ElevenLabsClient } from '@elevenlabs/client';
+import { C } from '@elevenlabs/client';
 
 export class VoiceCallService {
   private client: ElevenLabsClient;
