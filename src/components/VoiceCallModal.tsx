@@ -196,11 +196,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             </div>
           )}
 
-          {conversationId && (
-            <p className="text-white/50 text-xs mt-2">
-              Session: {conversationId.slice(0, 8)}...
-            </p>
-          )}
+       
         </div>
 
         {/* Call States */}
@@ -336,22 +332,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
         )}
 
         {/* Connection Status */}
-        <div className="mt-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-blue-200 text-sm">Connection Status:</span>
-            <span className={`text-sm font-medium ${
-              conversation.status === 'connected' ? 'text-green-300' : 'text-gray-300'
-            }`}>
-              {conversation.status || 'disconnected'}
-            </span>
-          </div>
-          {hasAgentId && (
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-blue-200 text-sm">Agent ID:</span>
-              <span className="text-gray-300 text-xs font-mono">
-                {user.agentID?.slice(0, 12)}...
-              </span>
-            </div>
+      
           )}
         </div>
       </div>
