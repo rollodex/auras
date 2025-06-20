@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, X, Loader, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Phone, PhoneOff, X, AlertCircle } from 'lucide-react';
+import { Conversation } from '@elevenlabs/react';
 import { User } from '../types';
 import { VoiceCallService } from '../services/voiceCall';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,31 +16,28 @@ type CallState = 'idle' | 'connecting' | 'connected' | 'ended' | 'error';
 export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModalProps) {
   const { user: currentUser } = useAuth();
   const [callState, setCallState] = useState<CallState>('idle');
-  const [isMuted, setIsMuted] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
-  const [errorMessage, setErrorMessage] = useState<string>('');
   const [voiceService] = useState(new VoiceCallService());
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const callTimerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    let interval: NodeJS.Timeout;
     if (callState === 'connected') {
-      callTimerRef.current = setInterval(() => {
+      interval = setInterval(() => {
         setCallDuration(prev => prev + 1);
       }, 1000);
-    } else {
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-      }
     }
-
     return () => {
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-      }
+      if (interval) clearInterval(interval);
     };
   }, [callState]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setCallState('idle');
+      setCallDuration(0);
+      voiceService.endCall();
+    }
+  }, [isOpen, voiceService]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -47,57 +45,22 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startCall = async () => {
-    // Check for validation errors before starting
-    const validationError = voiceService.getValidationError();
-    if (validationError) {
-      setErrorMessage(validationError);
+  const startCall = () => {
+    if (!voiceService.hasRequiredConfig()) {
       setCallState('error');
       return;
     }
-
     setCallState('connecting');
-    setCallDuration(0);
-    setErrorMessage('');
-
-    // Prepare user profile for the voice call
-    const userProfile = currentUser ? {
-      name: currentUser.name,
-      age: currentUser.age,
-      bio: currentUser.bio,
-      interests: currentUser.interests,
-      personality: currentUser.personality
-    } : undefined;
-
-    const signedUrl = await voiceService.startCall(
-      user.name,
-      user.personality.detailedPrompt,
-      user.personality.aiPersona,
-      (state) => {
-        setCallState(state);
-        if (state === 'error') {
-          setErrorMessage('Failed to connect to voice service. Please check your API configuration.');
-        }
-      },
-      userProfile
-    );
-
-    if (signedUrl && iframeRef.current) {
-      iframeRef.current.src = signedUrl;
-    }
+    voiceService.startCall();
   };
 
   const endCall = () => {
     setCallState('ended');
     voiceService.endCall();
-    if (iframeRef.current) {
-      iframeRef.current.src = '';
-    }
     setTimeout(() => {
       onClose();
       setCallState('idle');
       setCallDuration(0);
-      setErrorMessage('');
     }, 2000);
   };
 
@@ -108,14 +71,28 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
       onClose();
       setCallState('idle');
       setCallDuration(0);
-      setErrorMessage('');
     }
+  };
+
+  const handleConversationStart = () => {
+    setCallState('connected');
+  };
+
+  const handleConversationEnd = () => {
+    setCallState('ended');
+    voiceService.endCall();
+    setTimeout(() => {
+      onClose();
+      setCallState('idle');
+      setCallDuration(0);
+    }, 2000);
   };
 
   if (!isOpen) return null;
 
   const hasApiKey = !!import.meta.env.VITE_ELEVENLABS_API_KEY;
   const hasAgentId = !!import.meta.env.VITE_ELEVENLABS_AGENT_ID;
+  const configError = voiceService.getConfigError();
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
@@ -181,16 +158,6 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
           </div>
         )}
 
-        {callState === 'connecting' && (
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Loader className="w-8 h-8 text-white animate-spin" />
-            </div>
-            <p className="text-white text-lg font-medium mb-2">Connecting...</p>
-            <p className="text-white/70 text-sm">Setting up your personalized voice call with {user.name}</p>
-          </div>
-        )}
-
         {callState === 'error' && (
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -198,13 +165,10 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             </div>
             <p className="text-white text-lg font-medium mb-2">Call Failed</p>
             <p className="text-white/70 text-sm mb-4">
-              {errorMessage || 'Unable to connect. Please check your API configuration.'}
+              {configError || 'Unable to connect. Please check your API configuration.'}
             </p>
             <button
-              onClick={() => {
-                setCallState('idle');
-                setErrorMessage('');
-              }}
+              onClick={() => setCallState('idle')}
               className="bg-white/20 text-white px-6 py-2 rounded-xl hover:bg-white/30 transition-colors"
             >
               Try Again
@@ -224,56 +188,27 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
           </div>
         )}
 
-        {/* ElevenLabs Conversation Widget */}
-        {(callState === 'connecting' || callState === 'connected') && (
+        {/* ElevenLabs Conversation Component */}
+        {(callState === 'connecting' || callState === 'connected') && hasApiKey && hasAgentId && (
           <div className="mb-8">
-            <iframe
-              ref={iframeRef}
+            <Conversation
+              agentId={import.meta.env.VITE_ELEVENLABS_AGENT_ID}
+              apiKey={import.meta.env.VITE_ELEVENLABS_API_KEY}
+              onConversationStart={handleConversationStart}
+              onConversationEnd={handleConversationEnd}
               className="w-full h-64 rounded-2xl border border-white/20"
-              allow="microphone"
-              style={{ display: callState === 'connected' ? 'block' : 'none' }}
             />
           </div>
         )}
 
         {/* Call Controls */}
         {callState === 'connected' && (
-          <div className="flex justify-center space-x-6">
-            <button
-              onClick={() => setIsMuted(!isMuted)}
-              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-                isMuted 
-                  ? 'bg-red-500 hover:bg-red-600' 
-                  : 'bg-white/20 hover:bg-white/30'
-              }`}
-            >
-              {isMuted ? (
-                <MicOff className="w-6 h-6 text-white" />
-              ) : (
-                <Mic className="w-6 h-6 text-white" />
-              )}
-            </button>
-
+          <div className="flex justify-center">
             <button
               onClick={endCall}
               className="w-14 h-14 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-all transform hover:scale-105"
             >
               <PhoneOff className="w-6 h-6 text-white" />
-            </button>
-
-            <button
-              onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-                isSpeakerOn 
-                  ? 'bg-white/20 hover:bg-white/30' 
-                  : 'bg-gray-500 hover:bg-gray-600'
-              }`}
-            >
-              {isSpeakerOn ? (
-                <Volume2 className="w-6 h-6 text-white" />
-              ) : (
-                <VolumeX className="w-6 h-6 text-white" />
-              )}
             </button>
           </div>
         )}
