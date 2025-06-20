@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, PhoneOff, X, AlertCircle, Loader } from 'lucide-react';
+import { Phone, PhoneOff, X, AlertCircle, Loader, Mic, MicOff } from 'lucide-react';
+import { useConversation } from '@elevenlabs/react';
 import { User } from '../types';
-import { VoiceCallService } from '../services/voiceCall';
 import { useAuth } from '../contexts/AuthContext';
 
 interface VoiceCallModalProps {
@@ -10,15 +10,34 @@ interface VoiceCallModalProps {
   onClose: () => void;
 }
 
-type CallState = 'idle' | 'connecting' | 'connected' | 'ended' | 'error';
+type CallState = 'idle' | 'requesting-mic' | 'connecting' | 'connected' | 'ended' | 'error';
 
 export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModalProps) {
   const { user: currentUser } = useAuth();
   const [callState, setCallState] = useState<CallState>('idle');
   const [callDuration, setCallDuration] = useState(0);
-  const [voiceService] = useState(new VoiceCallService());
-  const [conversation, setConversation] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [conversationId, setConversationId] = useState<string>('');
+  const [micPermission, setMicPermission] = useState<boolean>(false);
+
+  const conversation = useConversation({
+    onConnect: () => {
+      console.log('Conversation connected');
+      setCallState('connected');
+    },
+    onDisconnect: () => {
+      console.log('Conversation disconnected');
+      setCallState('ended');
+    },
+    onMessage: (message) => {
+      console.log('Message received:', message);
+    },
+    onError: (error) => {
+      console.error('Conversation error:', error);
+      setCallState('error');
+      setErrorMessage(error.message || 'An error occurred during the call');
+    }
+  });
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -37,10 +56,13 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
       setCallState('idle');
       setCallDuration(0);
       setErrorMessage('');
-      voiceService.endCall();
-      setConversation(null);
+      setConversationId('');
+      setMicPermission(false);
+      if (conversation.status === 'connected') {
+        conversation.endSession();
+      }
     }
-  }, [isOpen, voiceService]);
+  }, [isOpen, conversation]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -48,10 +70,32 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startCall = async () => {
-    if (!voiceService.hasRequiredConfig()) {
+  const requestMicrophonePermission = async () => {
+    try {
+      setCallState('requesting-mic');
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicPermission(true);
+      return true;
+    } catch (error) {
+      console.error('Microphone permission denied:', error);
       setCallState('error');
-      setErrorMessage(voiceService.getConfigError() || 'Configuration error');
+      setErrorMessage('Microphone access is required for voice calls. Please allow microphone access and try again.');
+      return false;
+    }
+  };
+
+  const startCall = async () => {
+    const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
+    
+    if (!agentId) {
+      setCallState('error');
+      setErrorMessage('Agent ID is not configured. Please add VITE_ELEVENLABS_AGENT_ID to your .env file.');
+      return;
+    }
+
+    // Request microphone permission first
+    const hasPermission = await requestMicrophonePermission();
+    if (!hasPermission) {
       return;
     }
 
@@ -59,26 +103,36 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
     setErrorMessage('');
 
     try {
-      const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
-      const conv = await voiceService.startCall(agentId);
-      setConversation(conv);
-      setCallState('connected');
+      // Start the conversation session
+      const id = await conversation.startSession({ 
+        agentId: agentId 
+      });
+      
+      setConversationId(id);
+      // State will be updated to 'connected' via onConnect callback
     } catch (error) {
-      console.error('Voice call error:', error);
+      console.error('Failed to start voice call:', error);
       setCallState('error');
       setErrorMessage(error instanceof Error ? error.message : 'Failed to start voice call');
     }
   };
 
-  const endCall = () => {
-    setCallState('ended');
-    voiceService.endCall();
-    setConversation(null);
-    setTimeout(() => {
+  const endCall = async () => {
+    try {
+      await conversation.endSession();
+      setCallState('ended');
+      setTimeout(() => {
+        onClose();
+        setCallState('idle');
+        setCallDuration(0);
+      }, 2000);
+    } catch (error) {
+      console.error('Error ending call:', error);
+      // Still close the modal even if there's an error
       onClose();
       setCallState('idle');
       setCallDuration(0);
-    }, 2000);
+    }
   };
 
   const handleClose = () => {
@@ -94,7 +148,6 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
 
   if (!isOpen) return null;
 
-  const hasApiKey = !!import.meta.env.VITE_ELEVENLABS_API_KEY;
   const hasAgentId = !!import.meta.env.VITE_ELEVENLABS_AGENT_ID;
 
   return (
@@ -126,6 +179,13 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
                 <div className="w-4 h-4 bg-green-400 rounded-full animate-pulse"></div>
               </div>
             )}
+            {conversation.isSpeaking && (
+              <div className="absolute -top-2 -right-2">
+                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center animate-pulse">
+                  <Mic className="w-3 h-3 text-white" />
+                </div>
+              </div>
+            )}
           </div>
           <h4 className="text-2xl font-bold text-white mb-1">{user.name}</h4>
           <p className="text-white/70 text-sm mb-2">AI Persona Voice Call</p>
@@ -134,6 +194,12 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             <div className="bg-white/10 rounded-full px-4 py-2 inline-block">
               <span className="text-white text-sm font-mono">{formatDuration(callDuration)}</span>
             </div>
+          )}
+
+          {conversationId && (
+            <p className="text-white/50 text-xs mt-2">
+              Session: {conversationId.slice(0, 8)}...
+            </p>
           )}
         </div>
 
@@ -146,9 +212,9 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             </p>
             <button
               onClick={startCall}
-              disabled={!hasApiKey || !hasAgentId}
+              disabled={!hasAgentId}
               className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto transition-all transform ${
-                hasApiKey && hasAgentId
+                hasAgentId
                   ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:shadow-xl hover:scale-105'
                   : 'bg-gray-500 cursor-not-allowed opacity-50'
               }`}
@@ -156,8 +222,18 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
               <Phone className="w-8 h-8 text-white" />
             </button>
             <p className="text-white/60 text-sm mt-4">
-              {hasApiKey && hasAgentId ? 'Tap to start call' : 'API configuration required'}
+              {hasAgentId ? 'Tap to start call' : 'Agent ID configuration required'}
             </p>
+          </div>
+        )}
+
+        {callState === 'requesting-mic' && (
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Mic className="w-8 h-8 text-white" />
+            </div>
+            <p className="text-white text-lg font-medium mb-2">Requesting Microphone</p>
+            <p className="text-white/70 text-sm">Please allow microphone access to start the call</p>
           </div>
         )}
 
@@ -179,14 +255,17 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             <p className="text-white text-lg font-medium mb-2">Connected!</p>
             <p className="text-white/70 text-sm">You're now talking with {user.name}'s AI persona</p>
             
-            {/* Conversation Info */}
-            {conversation && (
-              <div className="mt-4 p-4 bg-white/10 rounded-xl">
-                <p className="text-white/80 text-sm">
-                  Conversation ID: {conversation.conversationId || 'Active'}
-                </p>
+            {/* Speaking Indicator */}
+            <div className="mt-4 flex items-center justify-center space-x-4">
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${
+                conversation.isSpeaking ? 'bg-blue-500/30 border border-blue-500/50' : 'bg-white/10'
+              }`}>
+                <Mic className="w-4 h-4 text-white" />
+                <span className="text-white text-sm">
+                  {conversation.isSpeaking ? 'AI Speaking' : 'Listening'}
+                </span>
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -197,7 +276,7 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
             </div>
             <p className="text-white text-lg font-medium mb-2">Call Failed</p>
             <p className="text-white/70 text-sm mb-4">
-              {errorMessage || 'Unable to connect. Please check your API configuration.'}
+              {errorMessage || 'Unable to connect. Please check your configuration.'}
             </p>
             <button
               onClick={() => setCallState('idle')}
@@ -222,40 +301,53 @@ export default function VoiceCallModal({ user, isOpen, onClose }: VoiceCallModal
 
         {/* Call Controls */}
         {callState === 'connected' && (
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center space-x-4 mb-6">
             <button
               onClick={endCall}
               className="w-14 h-14 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-all transform hover:scale-105"
             >
               <PhoneOff className="w-6 h-6 text-white" />
             </button>
+            
+            {/* Volume Control */}
+            <button
+              onClick={() => conversation.setVolume({ volume: 0.5 })}
+              className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-all transform hover:scale-105"
+              title="Adjust volume"
+            >
+              <span className="text-white text-sm">🔊</span>
+            </button>
           </div>
         )}
 
-        {/* API Configuration Notice */}
-        {(!hasApiKey || !hasAgentId) && (
+        {/* Configuration Notice */}
+        {!hasAgentId && (
           <div className="mt-6 p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
             <div className="flex items-start space-x-3">
               <AlertCircle className="w-5 h-5 text-yellow-200 mt-0.5 flex-shrink-0" />
               <div className="text-yellow-200 text-sm">
                 <p className="font-medium mb-2">Voice calls require ElevenLabs configuration:</p>
                 <ul className="space-y-1 text-xs">
-                  {!hasApiKey && <li>• Add VITE_ELEVENLABS_API_KEY to your .env file</li>}
-                  {!hasAgentId && <li>• Add VITE_ELEVENLABS_AGENT_ID to your .env file</li>}
+                  <li>• Add VITE_ELEVENLABS_AGENT_ID to your .env file</li>
                 </ul>
                 <p className="mt-2 text-xs opacity-80">
-                  Get your API key and create an agent at elevenlabs.io
+                  Create an agent at elevenlabs.io/app/conversational-ai
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Development Note */}
+        {/* Connection Status */}
         <div className="mt-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-xl">
-          <p className="text-blue-200 text-xs text-center">
-            Note: This creates a conversation session. For full voice functionality, you'll need to implement audio streaming with the ElevenLabs WebSocket API or use their web component.
-          </p>
+          <div className="flex items-center justify-between">
+            <span className="text-blue-200 text-sm">Connection Status:</span>
+            <span className={`text-sm font-medium ${
+              conversation.status === 'connected' ? 'text-green-300' : 'text-gray-300'
+            }`}>
+              {conversation.status || 'disconnected'}
+            </span>
+          </div>
         </div>
       </div>
     </div>
