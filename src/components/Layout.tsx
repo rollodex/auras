@@ -1,7 +1,8 @@
 import React from 'react';
-import { Heart, User, MessageCircle, Sparkles, LogOut } from 'lucide-react';
+import { Heart, User, MessageCircle, Sparkles, LogOut, Clock } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { DataService } from '../services/dataService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,16 @@ export default function Layout({ children }: LayoutProps) {
 
   // Don't show bottom nav if user hasn't completed profile
   const showBottomNav = isAuthenticated && hasCompletedProfile;
+
+  // Get pending match requests count
+  const getPendingRequestsCount = () => {
+    if (!isAuthenticated) return 0;
+    const dataService = DataService.getInstance();
+    const matches = dataService.getMatches();
+    return matches.filter(match => match.status === 'pending').length;
+  };
+
+  const pendingCount = getPendingRequestsCount();
 
   return (
     <div className="min-h-screen bg-night-black">
@@ -60,6 +71,22 @@ export default function Layout({ children }: LayoutProps) {
                 <Heart className="w-6 h-6 mb-1" />
                 <span className="text-xs">Browse</span>
               </Link>
+              
+              <Link 
+                to="/match-requests" 
+                className={`flex flex-col items-center p-2 rounded-lg transition-colors relative ${
+                  location.pathname === '/match-requests' ? 'text-glow-white bg-glow-white/20' : 'text-glow-white/70'
+                }`}
+              >
+                <Clock className="w-6 h-6 mb-1" />
+                <span className="text-xs">Requests</span>
+                {pendingCount > 0 && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-rizz-pink rounded-full flex items-center justify-center">
+                    <span className="text-glow-white text-xs font-bold">{pendingCount}</span>
+                  </div>
+                )}
+              </Link>
+              
               <Link 
                 to="/chats" 
                 className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
@@ -69,6 +96,7 @@ export default function Layout({ children }: LayoutProps) {
                 <MessageCircle className="w-6 h-6 mb-1" />
                 <span className="text-xs">Chats</span>
               </Link>
+              
               <Link 
                 to="/profile" 
                 className={`flex flex-col items-center p-2 rounded-lg transition-colors ${

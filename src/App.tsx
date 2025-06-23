@@ -9,6 +9,7 @@ import ProfileSetup from './components/ProfileSetup';
 import BrowseProfiles from './components/BrowseProfiles';
 import AIChat from './components/AIChat';
 import Chats from './components/Chats';
+import MatchRequests from './components/MatchRequests';
 import Profile from './components/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -57,6 +58,14 @@ function App() {
               element={
                 <ProtectedRoute requiresQuiz requiresProfile>
                   <Chats />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/match-requests" 
+              element={
+                <ProtectedRoute requiresQuiz requiresProfile>
+                  <MatchRequests />
                 </ProtectedRoute>
               } 
             />

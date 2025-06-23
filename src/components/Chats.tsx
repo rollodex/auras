@@ -16,8 +16,8 @@ export default function Chats() {
   }, [dataService]);
 
   const loadAllChats = () => {
-    // Get existing matches/chats
-    const existingMatches = dataService.getMatches();
+    // Get existing matches/chats - only show matched ones (not pending)
+    const existingMatches = dataService.getMatches().filter(match => match.status === 'matched');
     const allChats: Match[] = [...existingMatches];
     
     // Get all chat histories and create chat entries for users not in matches
@@ -46,16 +46,18 @@ export default function Chats() {
             const isReal = isRealChat(userId);
             const status = isReal ? 'matched' : 'pending'; // AI chats are pending until matched
             
-            // Create a chat entry for this conversation
-            const chatEntry: Match = {
-              id: `chat_${userId}_${Date.now()}`,
-              user: userData,
-              compatibility: 75 + Math.floor(Math.random() * 25), // Random compatibility
-              chatHistory: messages,
-              status: status as const
-            };
-            
-            allChats.push(chatEntry);
+            // Only show matched chats here (pending ones go to match requests)
+            if (status === 'matched') {
+              const chatEntry: Match = {
+                id: `chat_${userId}_${Date.now()}`,
+                user: userData,
+                compatibility: 75 + Math.floor(Math.random() * 25), // Random compatibility
+                chatHistory: messages,
+                status: status as const
+              };
+              
+              allChats.push(chatEntry);
+            }
           }
         }
       }
@@ -74,28 +76,6 @@ export default function Chats() {
     });
     
     setChats(allChats);
-  };
-
-  const handleAcceptMatch = (chatId: string) => {
-    dataService.updateMatchStatus(chatId, 'matched');
-    setChats(prev => 
-      prev.map(chat => 
-        chat.id === chatId 
-          ? { ...chat, status: 'matched' as const }
-          : chat
-      )
-    );
-  };
-
-  const handleDeclineMatch = (chatId: string) => {
-    dataService.updateMatchStatus(chatId, 'declined');
-    setChats(prev => 
-      prev.map(chat => 
-        chat.id === chatId 
-          ? { ...chat, status: 'declined' as const }
-          : chat
-      )
-    );
   };
 
   const handleChatClick = (chat: Match) => {
@@ -166,27 +146,8 @@ export default function Chats() {
 
   const getChatTypeInfo = (chat: Match) => {
     const isReal = isRealChat(chat.user.id);
-    const isPending = chat.status === 'pending';
     
-    if (isPending && !isReal) {
-      return {
-        type: 'ai',
-        label: 'AI',
-        icon: Bot,
-        bgColor: 'bg-aura-violet/20',
-        textColor: 'text-aura-violet',
-        borderColor: 'border-aura-violet/30'
-      };
-    } else if (isPending && isReal) {
-      return {
-        type: 'pending',
-        label: 'Pending',
-        icon: Clock,
-        bgColor: 'bg-yellow-500/20',
-        textColor: 'text-yellow-300',
-        borderColor: 'border-yellow-500/30'
-      };
-    } else if (isReal) {
+    if (isReal) {
       return {
         type: 'real',
         label: 'Real',
@@ -207,8 +168,8 @@ export default function Chats() {
     }
   };
 
-  // Filter out declined chats for display
-  const visibleChats = chats.filter(chat => chat.status !== 'declined');
+  // Filter out declined chats for display (only show matched chats)
+  const visibleChats = chats.filter(chat => chat.status === 'matched');
 
   return (
     <div className="min-h-screen bg-night-black relative overflow-hidden">
@@ -251,23 +212,30 @@ export default function Chats() {
             <div className="w-20 h-20 bg-glow-white/10 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-lg border border-glow-white/20">
               <MessageCircle className="w-10 h-10 text-glow-white/50" />
             </div>
-            <h3 className="text-glow-white text-lg font-semibold mb-2">No chats yet</h3>
+            <h3 className="text-glow-white text-lg font-semibold mb-2">No active chats</h3>
             <p className="text-glow-white/70 mb-6">
-              Start chatting with AI personas to find your perfect vibe!
+              Start chatting with AI personas and accept match requests to see conversations here!
             </p>
-            <button
-              onClick={() => navigate('/browse')}
-              className="bg-synthetic-gradient text-glow-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all"
-            >
-              Start Browsing
-            </button>
+            <div className="flex flex-col space-y-3">
+              <button
+                onClick={() => navigate('/browse')}
+                className="bg-synthetic-gradient text-glow-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all"
+              >
+                Start Browsing
+              </button>
+              <button
+                onClick={() => navigate('/match-requests')}
+                className="bg-glow-white/10 text-glow-white px-6 py-3 rounded-xl font-medium hover:bg-glow-white/20 transition-all border border-glow-white/20"
+              >
+                Check Match Requests
+              </button>
+            </div>
           </div>
         ) : (
           <div className="divide-y divide-glow-white/10">
             {visibleChats.map((chat) => {
               const lastMessage = getLastMessage(chat.user.id);
               const chatTypeInfo = getChatTypeInfo(chat);
-              const isPending = chat.status === 'pending';
               
               return (
                 <div
@@ -290,11 +258,9 @@ export default function Chats() {
                     
                     {/* Chat Type Indicator */}
                     <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-night-black ${
-                      chatTypeInfo.type === 'pending' 
-                        ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
-                        : chatTypeInfo.type === 'real' 
-                          ? 'bg-gradient-to-r from-emerald-500 to-green-500' 
-                          : 'bg-gradient-to-r from-aura-violet to-rizz-pink'
+                      chatTypeInfo.type === 'real' 
+                        ? 'bg-gradient-to-r from-emerald-500 to-green-500' 
+                        : 'bg-gradient-to-r from-aura-violet to-rizz-pink'
                     }`}>
                       <chatTypeInfo.icon className="w-2.5 h-2.5 text-glow-white" />
                     </div>
@@ -349,12 +315,7 @@ export default function Chats() {
                     {/* Last Message or Status */}
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        {isPending && chatTypeInfo.type === 'pending' ? (
-                          <div className="flex items-center space-x-1">
-                            <Clock className="w-3 h-3 text-yellow-400 flex-shrink-0" />
-                            <span className="text-yellow-400 text-sm font-medium">Match request pending</span>
-                          </div>
-                        ) : lastMessage ? (
+                        {lastMessage ? (
                           <div className="flex items-center space-x-1">
                             <span className="text-glow-white/60 text-sm">
                               {lastMessage.sender === 'user' ? 'You: ' : ''}
